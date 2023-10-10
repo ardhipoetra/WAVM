@@ -16,7 +16,7 @@
 #include <sanitizer/asan_interface.h>
 #endif
 
-#ifdef __linux__
+#ifdef  __GNU_LIBRARY__
 #include <gnu/libc-version.h>
 #endif
 
@@ -35,7 +35,7 @@
 #define MAP_ANONYMOUS MAP_ANON
 #endif
 
-#ifdef __linux__
+#ifdef  __GNU_LIBRARY__
 #define MAP_STACK_FLAGS (MAP_STACK)
 #else
 #define MAP_STACK_FLAGS 0
@@ -96,7 +96,7 @@ void SigAltStack::deinit()
 	}
 }
 
-#ifdef __linux__
+#ifdef  __GNU_LIBRARY__
 static void getGlibcVersion(unsigned long& outMajor, unsigned long& outMinor)
 {
 	const char* versionString = gnu_get_libc_version();
@@ -133,23 +133,27 @@ static void getThreadStack(pthread_t thread, U8*& outMinGuardAddr, U8*& outMinAd
 
 	outMaxAddr = outMinAddr + numStackBytes;
 
-	// Before GLIBC 2.27, pthread_attr_getstack erroneously included the guard page in the result.
-	unsigned long glibcMajorVersion = 0;
-	unsigned long glibcMinorVersion = 0;
-	getGlibcVersion(glibcMajorVersion, glibcMinorVersion);
-	if(glibcMajorVersion > 2 || (glibcMajorVersion == 2 && glibcMinorVersion >= 27))
-	{ outMinGuardAddr = outMinAddr - numGuardBytes; }
-	else
-	{
-		outMinGuardAddr = outMinAddr;
-		outMinAddr += numGuardBytes;
+	// assuming musl's getstack is ok
+	outMinGuardAddr = outMinAddr - numGuardBytes; 
 
-		// CentOS 7's GLIBC says it's version 2.17, but appears to have the pthread_attr_getstack
-		// patch from GLIBC 2.27. I'm not sure how to precisely detect this situation, so just
-		// make a conservative guess that the guard region extends 1 page both above and below the
-		// returned stack base address.
-		outMinGuardAddr -= numGuardBytes;
-	}
+	// Before GLIBC 2.27, pthread_attr_getstack erroneously included the guard page in the result.
+//	unsigned long glibcMajorVersion = 0;
+//	unsigned long glibcMinorVersion = 0;
+//	getGlibcVersion(glibcMajorVersion, glibcMinorVersion);
+//	if(glibcMajorVersion > 2 || (glibcMajorVersion == 2 && glibcMinorVersion >= 27))
+//	{ outMinGuardAddr = outMinAddr - numGuardBytes; }
+//	else
+//	{
+//		outMinGuardAddr = outMinAddr;
+//		outMinAddr += numGuardBytes;
+//
+//		// CentOS 7's GLIBC says it's version 2.17, but appears to have the pthread_attr_getstack
+//		// patch from GLIBC 2.27. I'm not sure how to precisely detect this situation, so just
+//		// make a conservative guess that the guard region extends 1 page both above and below the
+//		// returned stack base address.
+//		outMinGuardAddr -= numGuardBytes;
+//	}
+
 #elif defined(__APPLE__)
 	// MacOS uses pthread_get_stackaddr_np, and returns a pointer to the maximum address of the
 	// stack.
